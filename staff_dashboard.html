@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}لوحة تحكم الموظفين{% endblock %}
+{% block content %}
+
+<!-- 1. نموذج تسجيل حركة جديدة -->
+<div class="card shadow-sm p-4 mb-4">
+  <h5 class="fw-bold mb-3">تسجيل حركة جديدة لطالب</h5>
+  <form method="post" class="row g-3">
+    <div class="col-md-3">
+      <label class="form-label">المعرف الفريد للبطاقة</label>
+      <input type="text" name="card_uid" list="cardsList" class="form-control" placeholder="CARD-1001" required>
+      <datalist id="cardsList">
+        {% for s in students %}
+          <option value="{{ s.card_uid }}">{{ s.full_name }} - {{ s.department }}</option>
+        {% endfor %}
+      </datalist>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">نوع الحركة</label>
+      <select name="movement_type" class="form-select" required>
+        {% for t in movement_types %}
+          <option value="{{ t }}">{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">التاريخ</label>
+      <input type="date" name="movement_date" value="{{ selected_date }}" class="form-control" required>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">الوقت (اختياري = الآن)</label>
+      <input type="time" step="1" name="movement_time" class="form-control">
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+      <button type="submit" class="btn btn-primary w-100">حفظ الحركة</button>
+    </div>
+    <div class="col-12">
+      <input type="text" name="notes" class="form-control" placeholder="ملاحظات إضافية (اختياري)">
+    </div>
+  </form>
+</div>
+
+<!-- 2. جدول الحركات اليومية + التعديل + تصدير Excel -->
+<div class="card shadow-sm p-4 mb-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h5 class="fw-bold m-0">حركات اليوم ({{ selected_date }})</h5>
+    <div class="d-flex flex-wrap gap-2">
+      <form method="get" class="d-flex gap-2">
+        <input type="date" name="date" value="{{ selected_date }}" class="form-control form-control-sm">
+        <button type="submit" class="btn btn-outline-secondary btn-sm">عرض</button>
+      </form>
+      <a href="{{ url_for('export_daily_excel', date=selected_date) }}" class="btn btn-success btn-sm">
+        تصدير تقرير اليوم Excel (.xlsx)
+      </a>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th>#</th>
+          <th>اسم الطالب</th>
+          <th>معرف البطاقة</th>
+          <th>القسم العلمي</th>
+          <th>نوع الحركة</th>
+          <th>التاريخ والوقت</th>
+          <th>الموظف المسؤول</th>
+          <th>ملاحظات</th>
+          <th>تعديل</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in movements %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ m.student_name }}</td>
+          <td><code>{{ m.card_uid }}</code></td>
+          <td>{{ m.department }}</td>
+          <td><span class="badge bg-primary">{{ m.movement_type }}</span></td>
+          <td>{{ m.movement_date }} — <strong>{{ m.movement_time }}</strong></td>
+          <td>{{ m.staff_name }}</td>
+          <td>{{ m.notes or '-' }}</td>
+          <td>
+            <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editModal{{ m.id }}">
+              تعديل
+            </button>
+          </td>
+        </tr>
+
+        <!-- نافذة تعديل الحركة -->
+        <div class="modal fade" id="editModal{{ m.id }}" tabindex="-1">
+          <div class="modal-dialog">
+            <form method="post" action="{{ url_for('edit_movement', movement_id=m.id) }}" class="modal-content">
+              <div class="modal-header">
+                <h6 class="modal-title fw-bold">تعديل حركة: {{ m.student_name }}</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <div class="mb-3">
+                  <label class="form-label">نوع الحركة</label>
+                  <select name="movement_type" class="form-select" required>
+                    {% for t in movement_types %}
+                      <option value="{{ t }}" {% if t == m.movement_type %}selected{% endif %}>{{ t }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">التاريخ</label>
+                  <input type="date" name="movement_date" value="{{ m.movement_date }}" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">الوقت المضبوط</label>
+                  <input type="time" step="1" name="movement_time" value="{{ m.movement_time }}" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">ملاحظات</label>
+                  <input type="text" name="notes" value="{{ m.notes or '' }}" class="form-control">
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center text-muted">لا توجد حركات مسجلة في هذا التاريخ.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 3. إضافة طالب جديد -->
+<div class="card shadow-sm p-4 mb-4">
+  <h5 class="fw-bold mb-3">إضافة طالب جديد</h5>
+  <form method="post" action="{{ url_for('add_student') }}" class="row g-3">
+    <div class="col-md-3">
+      <input type="text" name="full_name" class="form-control" placeholder="الاسم الكامل" required>
+    </div>
+    <div class="col-md-2">
+      <input type="text" name="card_uid" class="form-control" placeholder="معرف البطاقة" required>
+    </div>
+    <div class="col-md-2">
+      <input type="text" name="phone" class="form-control" placeholder="رقم الهاتف" required>
+    </div>
+    <div class="col-md-3">
+      <input type="text" name="department" class="form-control" placeholder="القسم العلمي" required>
+    </div>
+    <div class="col-md-2">
+      <button type="submit" class="btn btn-dark w-100">إضافة طالب</button>
+    </div>
+  </form>
+</div>
+
+<!-- 4. إدارة الموظفين والصلاحيات (تظهر للمدير فقط) -->
+{% if session.get('staff_role') == 'admin' %}
+<div class="card shadow-sm p-4">
+  <h5 class="fw-bold mb-3">إدارة الموظفين والصلاحيات (صلاحية المدير)</h5>
+  <form method="post" action="{{ url_for('add_staff') }}" class="row g-3 mb-4">
+    <div class="col-md-3">
+      <input type="text" name="full_name" class="form-control" placeholder="اسم الموظف" required>
+    </div>
+    <div class="col-md-2">
+      <input type="text" name="username" class="form-control" placeholder="اسم المستخدم" required>
+    </div>
+    <div class="col-md-3">
+      <input type="password" name="password" class="form-control" placeholder="كلمة المرور (6+ أحرف)" required>
+    </div>
+    <div class="col-md-2">
+      <select name="role" class="form-select">
+        <option value="staff">موظف (staff)</option>
+        <option value="admin">مدير (admin)</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <button type="submit" class="btn btn-success w-100">إضافة موظف</button>
+    </div>
+  </form>
+
+  <table class="table table-sm table-bordered">
+    <thead class="table-light">
+      <tr>
+        <th>الاسم</th>
+        <th>اسم المستخدم</th>
+        <th>الصلاحية</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for st in staff_list %}
+      <tr>
+        <td>{{ st.full_name }}</td>
+        <td>{{ st.username }}</td>
+        <td>{{ 'مدير نظام' if st.role == 'admin' else 'موظف حركة' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endblock %}
